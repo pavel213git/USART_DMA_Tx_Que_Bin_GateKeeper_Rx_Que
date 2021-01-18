@@ -1,0 +1,15 @@
+"C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\bin\armproc.dll" 
+
+"C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\bin\armstlink2.dll" 
+
+"E:\ES\Code\STM32F103\en.stm32cubef1\STM32Cube_FW_F1_V1.8.0\Projects\STM32F103RB-Nucleo\Examples_LL\USART\USART_DMA_Tx_Que_Bin_GateKeeper_Rx_Que\EWARM\STM32F103RB-Nucleo\Exe\Project.out" 
+
+--plugin="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\bin\armbat.dll" 
+
+--device_macro="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\config\debugger\ST\STM32F1xx.dmac" 
+
+--flash_loader="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\config\flashloader\ST\FlashSTM32F10xxB.board" 
+
+
+
+
