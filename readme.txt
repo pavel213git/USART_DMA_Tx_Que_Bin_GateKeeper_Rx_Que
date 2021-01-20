@@ -66,6 +66,17 @@ In case of errors, LED2 is blinking (1sec period).
 
   - Launch the program. Press on User push button on board to initiate data transfer.
 
+
+
+///////////////////////////////////////////////////////////////////////////////////
+
+
+This is a test code which includes uart, adc and freertos modules.
+I have tested how to use semaphores, mutex and queues in ISR and tasks.
+
+
+///////////////////////////////////////////////////////////////////////////////////
+
 @par How to use it ? 
 
 In order to make the program work, you must do the following :
