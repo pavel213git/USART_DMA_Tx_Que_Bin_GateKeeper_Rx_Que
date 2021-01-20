@@ -31,6 +31,7 @@
 #include "stm32f1xx_ll_dma.h"
 #include "stm32f1xx_ll_usart.h"
 #include "stm32f1xx_ll_pwr.h"
+#include "stm32f1xx_ll_adc.h"      
 #if defined(USE_FULL_ASSERT)
 #include "stm32_assert.h"
 #endif /* USE_FULL_ASSERT */
@@ -41,6 +42,8 @@
 #include "queue.h"
 #include "semphr.h"
 #include "event_groups.h"
+      
+#include "adc_test.h"      
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
@@ -87,16 +90,35 @@
 #define DMA_HALF_TRANSFER_UART (uint8_t)(1 << 0)   
 #define DMA_FULL_TRANSFER_UART (uint8_t)(1 << 1)   
 #define DMA_HALF_RECEIVE_UART (uint8_t)(1 << 2)   
-#define DMA_FULL_RECEIVE_UART (uint8_t)(1 << 3)     
+#define DMA_FULL_RECEIVE_UART (uint8_t)(1 << 3)   
+#define DMA_HALF_TRANSFER_ADC (uint8_t)(1 << 4)   
+#define DMA_FULL_TRANSFER_ADC (uint8_t)(1 << 5)   
+
+
+/* Functions prototypes------------------------------------------------------- */                                                    
+void vTaskFunction1( void *pvParameters );
+void vTaskFunction2( void *pvParameters );
+void vPrintString( const char *pcString );
+void initTask( void *pvParameters );
+void prvStdioGatekeeperTask( void *pvParameters );                                                    
+void AdcProcessTask(void *pvParameters );
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
+extern void     LED_On(void);
+extern void     LED_Blinking(uint32_t Period);
+extern void     LED_Off(void);                                                    
 /* IRQ Handler treatment functions */
 void DMA1_TransmitHalf_Callback(void);                                                    
 void DMA1_TransmitComplete_Callback(void);
 void DMA1_ReceiveComplete_Callback(void);
 void USART_TransferError_Callback(void);
 void UserButton_Callback(void);
+
+/* Exported variables ------------------------------------------------------------*/
+extern SemaphoreHandle_t xBinSemaADC;
+extern __IO uint8_t flag_DMA;
+extern uint16_t adc_raw_data[ADC_CONVERTED_DATA_BUFFER_SIZE];
 #endif /* __MAIN_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

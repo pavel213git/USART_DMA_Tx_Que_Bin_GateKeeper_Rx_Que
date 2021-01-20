@@ -22,6 +22,7 @@ rule browsedata
 #Build steps
 build system_stm32f1xx.pbi : index system_stm32f1xx.xcl
 build stm32f1xx_ll_utils.pbi : index stm32f1xx_ll_utils.xcl
+build adc_test.pbi : index adc_test.xcl
 build main.pbi : index main.xcl
 build stm32f1xx_it.pbi : index stm32f1xx_it.xcl
 build heap_4.pbi : index heap_4.xcl
@@ -30,10 +31,10 @@ build list.pbi : index list.xcl
 build queue.pbi : index queue.xcl
 build tasks.pbi : index tasks.xcl
 build timers.pbi : index timers.xcl
-build Project_part0.pbi : link system_stm32f1xx.pbi stm32f1xx_ll_utils.pbi main.pbi
-build Project_part1.pbi : link stm32f1xx_it.pbi heap_4.pbi port.pbi
-build Project_part2.pbi : link list.pbi queue.pbi tasks.pbi
-build Project_part3.pbi : link timers.pbi
+build Project_part0.pbi : link system_stm32f1xx.pbi stm32f1xx_ll_utils.pbi adc_test.pbi
+build Project_part1.pbi : link main.pbi stm32f1xx_it.pbi heap_4.pbi
+build Project_part2.pbi : link port.pbi list.pbi queue.pbi
+build Project_part3.pbi : link tasks.pbi timers.pbi
 build Project.pbd : link Project_part0.pbi Project_part1.pbi Project_part2.pbi Project_part3.pbi
 build Project.pbw : browsedata Project.pbd
 

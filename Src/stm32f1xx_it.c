@@ -172,6 +172,44 @@ void USER_BUTTON_IRQHANDLER(void)
   * @param  None
   * @retval None
   */
+void DMA1_Channel1_IRQHandler(void)
+{
+  /* Check whether DMA transfer complete caused the DMA interruption */
+  if(LL_DMA_IsActiveFlag_TC1(DMA1) == 1)
+  {
+    /* Clear flag DMA transfer complete */
+    LL_DMA_ClearFlag_TC1(DMA1);
+    
+    /* Call interruption treatment function */
+    AdcDmaTransferComplete_Callback();
+  }
+  
+  /* Check whether DMA half transfer caused the DMA interruption */
+  if(LL_DMA_IsActiveFlag_HT1(DMA1) == 1)
+  {
+    /* Clear flag DMA half transfer */
+    LL_DMA_ClearFlag_HT1(DMA1);
+    
+    /* Call interruption treatment function */
+    AdcDmaTransferHalf_Callback();
+  }
+  
+  /* Check whether DMA transfer error caused the DMA interruption */
+  if(LL_DMA_IsActiveFlag_TE1(DMA1) == 1)
+  {
+    /* Clear flag DMA transfer error */
+    LL_DMA_ClearFlag_TE1(DMA1);
+    
+    /* Call interruption treatment function */
+    AdcDmaTransferError_Callback();
+  }
+}
+
+/**
+  * @brief  This function handles DMA1 interrupt request.
+  * @param  None
+  * @retval None
+  */
 void DMA1_Channel7_IRQHandler(void)
 {
 

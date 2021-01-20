@@ -22,6 +22,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stdio.h"
+#include "string.h"      
 /** @addtogroup STM32F1xx_LL_Examples
   * @{
   */
@@ -44,6 +45,14 @@ char str1[] = "I AM IN TASK1\r\n";
 char str2[] = "Received string matched\r\n";
 char str3[] = "Received string not matched\r\n";
 char str4[] = "Didn't received DMA Rx interrupt\r\n";
+char str5[] = "ADC DMA ISR didn't fired\r\n";
+                       //1234567890123456789012345678901234
+char adc_str[3][50] = {
+                        {"ADC DMA half transfer completed\r\n"},
+                        {"ADC DMA full transfer completed\r\n"},
+                        //123456789012345678901234567
+                        {"ADC DMA ISR didn't fired\r\n"}
+                    };
                                    //1234567890123456789
 //static const char *pcTextForTask1 = "Task 1 is running\r\n";
 static const char *pcTextForTask2 = "Task 2 is running\r\n";
@@ -53,7 +62,7 @@ __IO uint8_t flag_DMA = 0;
 
 
 SemaphoreHandle_t xMutex;
-SemaphoreHandle_t xBinarySemaphore, xBinSemaReceDMA;
+SemaphoreHandle_t xBinarySemaphore, xBinSemaReceDMA, xBinSemaADC;
 TaskHandle_t initTaskHandle = NULL, gatekeepTaskHandle = NULL;;
 /* Declare a variable of type QueueHandle_t. The queue is used to send messages
 from the print tasks and the tick interrupt to the gatekeeper task. */
@@ -66,6 +75,7 @@ typedef enum
     eNoTask = 0,
     eTask1, 
     eTask2, 
+    eTask3,
     eISR_DMA_RX,
     /* Other event types appear here but are not shown in this listing. */
 } eTask_t;
@@ -91,19 +101,12 @@ void     Configure_DMA(void);
 void     Configure_USART(void);
 void     StartTransfers(void);
 void     LED_Init(void);
-void     LED_On(void);
-void     LED_Blinking(uint32_t Period);
-void     LED_Off(void);
 void     UserButton_Init(void);
 void     WaitForUserButtonPress(void);
 void     WaitAndCheckEndOfTransfer(void);
 uint8_t  Buffercmp8(uint8_t* pBuffer1, uint8_t* pBuffer2, uint8_t BufferLength);
 void user_uart_tx(char *ptr, uint8_t size);
-void vTaskFunction1( void *pvParameters );
-void vTaskFunction2( void *pvParameters );
-void vPrintString( const char *pcString );
-void initTask( void *pvParameters );
-void prvStdioGatekeeperTask( void *pvParameters );
+
 /* Private functions ---------------------------------------------------------*/
 
 /**
@@ -126,14 +129,15 @@ int main(void)
     
     /* Before a queue is used it must be explicitly created. The queue is created
     to hold a maximum of 5 character pointers. */
-    xPrintQueue = xQueueCreate( 1, sizeof( Taskdata_t ) );
+    xPrintQueue = xQueueCreate( 3, sizeof( Taskdata_t ) );
     
     /* Before a semaphore is used it must be explicitly created. In this example
     a binary semaphore is created. */
     xBinarySemaphore = xSemaphoreCreateBinary();
     xBinSemaReceDMA = xSemaphoreCreateBinary();
+    xBinSemaADC = xSemaphoreCreateBinary();
     /* Check the queue was created successfully. */
-    if(( xPrintQueue != NULL ) && (xBinarySemaphore != NULL) && (xBinSemaReceDMA != NULL))
+    if(( xPrintQueue != NULL ) && (xBinarySemaphore != NULL) && (xBinSemaReceDMA != NULL) && (xBinSemaADC != NULL))
     {
         /* Create one of the two tasks. Note that a real application should check
         the return value of the xTaskCreate() call to ensure the task was created
@@ -144,13 +148,13 @@ int main(void)
                     configMINIMAL_STACK_SIZE, /* Stack depth - small microcontrollers will use much
                     less stack than this. */
                     (void*)str1, /* This example does not use the task parameter. */
-                    1, /* This task will run at priority 1. */
+                    2, /* This task will run at priority 1. */
                     NULL ); /* This example does not use the task handle. */
         /* Create the other task in exactly the same way and at the same priority. */
-        xTaskCreate( vTaskFunction2, "Task 2", configMINIMAL_STACK_SIZE, (void*)pcTextForTask2, 2, NULL );
+        xTaskCreate( vTaskFunction2, "Task 2", configMINIMAL_STACK_SIZE, (void*)pcTextForTask2, 3, NULL );
         
         xTaskCreate( initTask, "Task 0", configMINIMAL_STACK_SIZE, NULL, 4, initTaskHandle );
-        
+        xTaskCreate( AdcProcessTask, "Task 3", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
         /* Create the gatekeeper task. This is the only task that is permitted
         to directly access uart. */
         xTaskCreate( prvStdioGatekeeperTask, "Gatekeeper", configMINIMAL_STACK_SIZE, NULL, 0, gatekeepTaskHandle );
@@ -192,6 +196,15 @@ void prvStdioGatekeeperTask( void *pvParameters )
             pcMessageToPrint = xTaskReceStruct.pvData;
             user_uart_tx(pcMessageToPrint, ubNbDataToTransmit);
             break; 
+            
+          case eTask3:           
+            if(xSemaphoreTake( xBinarySemaphore, xDelay250ms ) == pdPASS)
+            {
+                ubNbDataToTransmit = xTaskReceStruct.datasize;
+                pcMessageToPrint = xTaskReceStruct.pvData;
+                user_uart_tx(pcMessageToPrint, ubNbDataToTransmit);
+            }
+            break;               
             
           case eISR_DMA_RX:
             xSemaphoreTake( xBinarySemaphore, xDelay250ms );
@@ -238,6 +251,29 @@ void initTask( void *pvParameters )
         
         /* Configure DMA channels for USART instance */
         Configure_DMA();
+        
+        /* Configure DMA for data transfer from ADC */
+        Configure_DMA_for_ADC();
+        
+        /* Configure timer as a time base used to trig ADC conversion start */
+        Configure_TIM_TimeBase_ADC_trigger();
+        
+        /* Configure ADC */
+        /* Note: This function configures the ADC but does not enable it.           */
+        /*       To enable it, use function "Activate_ADC()".                       */
+        /*       This is intended to optimize power consumption:                    */
+        /*       1. ADC configuration can be done once at the beginning             */
+        /*          (ADC disabled, minimal power consumption)                       */
+        /*       2. ADC enable (higher power consumption) can be done just before   */
+        /*          ADC conversions needed.                                         */
+        /*          Then, possible to perform successive "Activate_ADC()",          */
+        /*          "Deactivate_ADC()", ..., without having to set again            */
+        /*          ADC configuration.                                              */
+        Configure_ADC();
+        
+        /* Activate ADC */
+        /* Perform ADC activation procedure to make it ready to convert. */
+        Activate_ADC();
         
         /* Wait for User push-button press to start transfer */
         //WaitForUserButtonPress();
@@ -297,6 +333,63 @@ void vTaskFunction2( void *pvParameters )
         
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         vTaskDelay( xDelay100ms );       
+    }
+}
+
+void AdcProcessTask( void *pvParameters )
+{
+    char tmp_str[20] = {0}, tmp_str2[50] = {0};
+    uint16_t tmp_index = 0, tmp_adc_vol = 0;
+    char(*adcTaskName)[50];     //adcTaskName is pointer to char array of 35 elements
+    Taskdata_t xTaskStruct;
+    /* Inspect the high water mark of the calling task when the task starts to
+    execute. */
+    uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );    
+    const TickType_t xDelay100ms = pdMS_TO_TICKS( 100 );
+    adcTaskName = adc_str;
+    
+    xTaskStruct.eTaskType = eTask3;
+    for( ;; )
+    {
+        if(xSemaphoreTake(xBinSemaADC, xDelay100ms) == pdPASS)
+        {
+            if((flag_DMA & DMA_HALF_TRANSFER_ADC) == DMA_HALF_TRANSFER_ADC)
+            {
+                for (tmp_index = 0; tmp_index < (ADC_CONVERTED_DATA_BUFFER_SIZE/2); tmp_index++)
+                {               
+                    adc_raw_data[tmp_index] = aADCxConvertedData[tmp_index];
+                }
+                CLEAR_BIT(flag_DMA, DMA_HALF_TRANSFER_ADC);
+                xTaskStruct.pvData = (void *)(adcTaskName);
+                xTaskStruct.datasize = 34; 
+                xQueueSendToBack( xPrintQueue, &(xTaskStruct), xDelay100ms );
+            }
+            else if((flag_DMA & DMA_FULL_TRANSFER_ADC) == DMA_FULL_TRANSFER_ADC)
+            {
+                for (tmp_index = (ADC_CONVERTED_DATA_BUFFER_SIZE/2); tmp_index < ADC_CONVERTED_DATA_BUFFER_SIZE; tmp_index++)
+                {
+                    adc_raw_data[tmp_index] = aADCxConvertedData[tmp_index];
+                }
+                CLEAR_BIT(flag_DMA, DMA_FULL_TRANSFER_ADC);                
+                tmp_adc_vol = AdcAvgConvVol(adc_raw_data, (sizeof(adc_raw_data)/sizeof(adc_raw_data[0])));
+                sprintf(tmp_str, "Adc Vol = %d", tmp_adc_vol);
+                strcpy(tmp_str2, (char *)(adcTaskName+1));
+                strcat(tmp_str2, tmp_str);
+                xTaskStruct.pvData = (void *)tmp_str2;
+                xTaskStruct.datasize = 50; 
+                xQueueSendToBack( xPrintQueue, &(xTaskStruct), xDelay100ms );
+            }
+        }
+        else
+        {           
+            //xTaskStruct.pvData = (void *)(adcTaskName+2);  //This will also work
+            xTaskStruct.pvData = (void *)(&adcTaskName[2][0]);      ////This will also work
+            xTaskStruct.datasize = 27; 
+            xQueueSendToBack( xPrintQueue, &(xTaskStruct), xDelay100ms ); 
+        }
+        
+        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        //vTaskDelay( xDelay100ms );       
     }
 }
 
@@ -532,7 +625,7 @@ void LED_Blinking(uint32_t Period)
   {
     LL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);  
     //LL_mDelay(Period);
-    vTaskDelay( 100);
+    //vTaskDelay( 100);
   }
 }
 

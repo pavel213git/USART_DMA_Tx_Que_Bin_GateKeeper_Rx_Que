@@ -1090,6 +1090,9 @@ $PROJ_DIR$\..\Inc</state>
         <group>
             <name>User</name>
             <file>
+                <name>$PROJ_DIR$\..\Src\adc_test.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\Src\main.c</name>
             </file>
             <file>
